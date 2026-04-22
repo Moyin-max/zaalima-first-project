@@ -182,8 +182,8 @@ export default function AnalyticsPage() {
                     <div className="bg-secondary h-2 rounded-full" style={{ width: '65%' }} />
                   </div>
                   <div className="flex justify-between text-[10px] font-bold text-slate-400">
-                    <span>$1,625.40 USED</span>
-                    <span>$2,500.00 LIMIT</span>
+                    <span>₹1,625.40 USED</span>
+                    <span>₹2,500.00 LIMIT</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 pt-2">

@@ -534,7 +534,7 @@ export default function LandingPage({ darkMode, onToggleDark }) {
                     color: '#fff', padding: '9px 14px', borderRadius: '14px 4px 14px 14px',
                     fontSize: 12.5, maxWidth: '70%', lineHeight: 1.5,
                   }}>
-                    How do I process a refund over $500?
+                    How do I process a refund over ₹500?
                   </div>
                 </div>
 
@@ -546,7 +546,7 @@ export default function LandingPage({ darkMode, onToggleDark }) {
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: 11, fontWeight: 700, color: text, marginBottom: 6 }}>OpsMind AI</p>
                     <p style={{ fontSize: 11.5, color: muted, lineHeight: 1.65, marginBottom: 8 }}>
-                      For refunds over $500, you need to escalate to Finance via the internal portal. Here's the process: <strong style={{ color: text }}>1.</strong> Log into CRM and locate order. <strong style={{ color: text }}>2.</strong> Select "Initiate Refund". <strong style={{ color: text }}>3.</strong> For amounts over $500, select "Escalate to Finance"...
+                      For refunds over ₹500, you need to escalate to Finance via the internal portal. Here's the process: <strong style={{ color: text }}>1.</strong> Log into CRM and locate order. <strong style={{ color: text }}>2.</strong> Select "Initiate Refund". <strong style={{ color: text }}>3.</strong> For amounts over ₹500, select "Escalate to Finance"...
                     </p>
                     {/* Citation chips */}
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

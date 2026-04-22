@@ -6,6 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 export default function Topbar() {
   const { user } = useAuth();
   const { dark, toggleDark } = useTheme();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [notifications, setNotifications] = useState(3);
@@ -56,7 +57,10 @@ export default function Topbar() {
 
             {/* Notifications */}
             <button
-              onClick={() => setNotifications(0)}
+              onClick={() => {
+                setNotifications(0);
+                navigate('/settings');
+              }}
               className="relative p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#21253a] rounded-xl transition-colors"
             >
               <span className="material-symbols-outlined text-[20px]">notifications</span>
@@ -67,7 +71,10 @@ export default function Topbar() {
               )}
             </button>
 
-            <button className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#21253a] rounded-xl transition-colors">
+            <button 
+              onClick={() => navigate('/settings')}
+              className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#21253a] rounded-xl transition-colors"
+            >
               <span className="material-symbols-outlined text-[20px]">help_outline</span>
             </button>
 

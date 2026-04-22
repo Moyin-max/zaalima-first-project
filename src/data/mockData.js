@@ -67,7 +67,7 @@ export const mockSources = [
     id: 's7',
     fileName: 'ExpensePolicy_2024.pdf',
     page: 3,
-    snippet: 'All employee expenses above $50 require a receipt. Expenses above $500 require pre-approval from the department head before incurring the cost. Reimbursements are processed in the next available payroll cycle.',
+    snippet: 'All employee expenses above ₹50 require a receipt. Expenses above ₹500 require pre-approval from the department head before incurring the cost. Reimbursements are processed in the next available payroll cycle.',
     uploadDate: '2024-02-14',
     relevance: 0.89,
   },
@@ -75,7 +75,7 @@ export const mockSources = [
     id: 's8',
     fileName: 'VendorManagement_SOP.pdf',
     page: 11,
-    snippet: 'New vendors must complete the vendor registration form and pass a compliance screening. The Procurement team will review submissions within 5 business days. Legal sign-off is required for any contract exceeding $10,000.',
+    snippet: 'New vendors must complete the vendor registration form and pass a compliance screening. The Procurement team will review submissions within 5 business days. Legal sign-off is required for any contract exceeding ₹10,000.',
     uploadDate: '2024-03-22',
     relevance: 0.85,
   },
@@ -92,7 +92,7 @@ export const initialMessages = [
   {
     id: 'm2',
     role: 'assistant',
-    content: `To process a customer refund, follow these steps:\n\n**1. Verify Refund Eligibility**\nCheck the customer's request falls within the 30-day return window and the item meets refund criteria per policy.\n\n**2. Initiate Refund in CRM**\nNavigate to the customer's order, select "Initiate Refund," enter the amount, and include detailed notes on the reason.\n\n**3. Finance Team Approval**\nRefunds above $500 require Finance team approval. Submit a request ticket with supporting documentation.\n\n**4. Processing Timeline**\nStandard refunds are processed within **7 business days**. Expedited refunds (ER requests) may be processed within 48 hours with supervisor sign-off.\n\n**5. Customer Notification**\nSend a confirmation email using the approved template from the Knowledge Base. Ensure the customer has their reference number for tracking.`,
+    content: `To process a customer refund, follow these steps:\n\n**1. Verify Refund Eligibility**\nCheck the customer's request falls within the 30-day return window and the item meets refund criteria per policy.\n\n**2. Initiate Refund in CRM**\nNavigate to the customer's order, select "Initiate Refund," enter the amount, and include detailed notes on the reason.\n\n**3. Finance Team Approval**\nRefunds above ₹500 require Finance team approval. Submit a request ticket with supporting documentation.\n\n**4. Processing Timeline**\nStandard refunds are processed within **7 business days**. Expedited refunds (ER requests) may be processed within 48 hours with supervisor sign-off.\n\n**5. Customer Notification**\nSend a confirmation email using the approved template from the Knowledge Base. Ensure the customer has their reference number for tracking.`,
     timestamp: '10:32 AM',
     sources: [mockSources[0], mockSources[1], mockSources[2]],
     citations: [
@@ -107,7 +107,7 @@ export const initialMessages = [
 const responses = [
   {
     keywords: ['refund', 'return', 'reimburse'],
-    text: `Based on our Refund Policy SOP, here is the complete workflow:\n\n**Eligibility Check**\nAll refund requests must be initiated within 30 calendar days of the original purchase. Items must be unused and in original packaging unless the defect is acknowledged by quality.\n\n**Steps to Process**\n1. Log into the CRM and locate the customer order\n2. Select "Initiate Refund" and complete the refund form\n3. For amounts over $500, escalate to Finance via the internal portal\n4. Processing takes **7 business days** (or 48 hours for emergency refunds with supervisor approval)\n\n**Customer Communication**\nAlways send the confirmation email using the approved template and include the tracking reference number.`,
+    text: `Based on our Refund Policy SOP, here is the complete workflow:\n\n**Eligibility Check**\nAll refund requests must be initiated within 30 calendar days of the original purchase. Items must be unused and in original packaging unless the defect is acknowledged by quality.\n\n**Steps to Process**\n1. Log into the CRM and locate the customer order\n2. Select "Initiate Refund" and complete the refund form\n3. For amounts over ₹500, escalate to Finance via the internal portal\n4. Processing takes **7 business days** (or 48 hours for emergency refunds with supervisor approval)\n\n**Customer Communication**\nAlways send the confirmation email using the approved template and include the tracking reference number.`,
     sources: [mockSources[0], mockSources[1], mockSources[2]],
     citations: [
       { label: 'RefundPolicy.pdf • Page 12',          sourceId: 's1' },
@@ -141,7 +141,7 @@ const responses = [
   },
   {
     keywords: ['expense', 'reimbursement', 'claim', 'receipt', 'travel'],
-    text: `Per the Expense Policy 2024, here's how to submit and approve expenses:\n\n**Expense Thresholds**\n| Amount | Requirement |\n|--------|-------------|\n| Under $50 | Self-approved, no receipt needed |\n| $50–$499 | Receipt required |\n| $500+ | Pre-approval from department head required BEFORE spending |\n\n**Submission Process**\n1. Log into the Expense portal and click "New Claim"\n2. Upload receipts (PDF or image)\n3. Select the appropriate cost centre and project code\n4. Submit — your manager receives an automatic review request\n\n**Reimbursement Timing**\nApproved expenses are reimbursed in the next available payroll cycle (typically within 2 weeks). International expenses are converted at the bank rate on the date of transaction.`,
+    text: `Per the Expense Policy 2024, here's how to submit and approve expenses:\n\n**Expense Thresholds**\n| Amount | Requirement |\n|--------|-------------|\n| Under ₹50 | Self-approved, no receipt needed |\n| ₹50–₹499 | Receipt required |\n| ₹500+ | Pre-approval from department head required BEFORE spending |\n\n**Submission Process**\n1. Log into the Expense portal and click "New Claim"\n2. Upload receipts (PDF or image)\n3. Select the appropriate cost centre and project code\n4. Submit — your manager receives an automatic review request\n\n**Reimbursement Timing**\nApproved expenses are reimbursed in the next available payroll cycle (typically within 2 weeks). International expenses are converted at the bank rate on the date of transaction.`,
     sources: [mockSources[6]],
     citations: [
       { label: 'ExpensePolicy_2024.pdf • Page 3', sourceId: 's7' },
@@ -149,7 +149,7 @@ const responses = [
   },
   {
     keywords: ['vendor', 'supplier', 'procurement', 'contract'],
-    text: `The Vendor Onboarding process is governed by the Vendor Management SOP:\n\n**Pre-qualification**\n- Complete the Vendor Registration Form (available on the Procurement intranet page)\n- Provide: company registration, insurance certificate, and banking details\n- Vendors must pass a compliance screening (background & sanctions check)\n\n**Review & Approval**\n- Procurement reviews all submissions within **5 business days**\n- Legal sign-off required for contracts exceeding **$10,000**\n- For strategic vendors (contracts >$50k), approval from the CFO is required\n\n**After Approval**\n- Procurement will send an approved Vendor ID\n- All subsequent purchase orders must reference this Vendor ID\n- Annual vendor performance reviews are conducted by the category manager`,
+    text: `The Vendor Onboarding process is governed by the Vendor Management SOP:\n\n**Pre-qualification**\n- Complete the Vendor Registration Form (available on the Procurement intranet page)\n- Provide: company registration, insurance certificate, and banking details\n- Vendors must pass a compliance screening (background & sanctions check)\n\n**Review & Approval**\n- Procurement reviews all submissions within **5 business days**\n- Legal sign-off required for contracts exceeding **₹10,000**\n- For strategic vendors (contracts >₹50k), approval from the CFO is required\n\n**After Approval**\n- Procurement will send an approved Vendor ID\n- All subsequent purchase orders must reference this Vendor ID\n- Annual vendor performance reviews are conducted by the category manager`,
     sources: [mockSources[7]],
     citations: [
       { label: 'VendorManagement_SOP.pdf • Page 11', sourceId: 's8' },
