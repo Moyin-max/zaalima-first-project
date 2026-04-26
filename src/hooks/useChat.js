@@ -4,8 +4,8 @@ let msgIdCounter = 100;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7001';
 
 export function useChat(sessionId = null) {
-  const [messages, setMessages]         = useState([]);
-  const [isStreaming, setIsStreaming]   = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const currentSessionId = useRef(sessionId);
   const streamRef = useRef(null);
@@ -47,12 +47,13 @@ export function useChat(sessionId = null) {
   }, []);
 
   const sendMessage = useCallback((text) => {
-    if (!text.trim() || isStreaming) return;
+    const query = text.trim();
+    if (!query || isStreaming) return;
 
     const userMsg = {
       id: `m${++msgIdCounter}`,
       role: 'user',
-      content: text.trim(),
+      content: query,
       timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     };
 
@@ -61,7 +62,7 @@ export function useChat(sessionId = null) {
     setIsStreaming(true);
     setStreamingText('');
 
-    const es = new EventSource(`${API_URL}/api/chat/stream?q=${encodeURIComponent(text.trim())}`);
+    const es = new EventSource(`${API_URL}/api/chat/stream?q=${encodeURIComponent(query)}`);
     
     let fullText = '';
     let sources = [];
@@ -112,6 +113,7 @@ export function useChat(sessionId = null) {
       console.error('SSE Error:', err);
       es.close();
       setIsStreaming(false);
+      setStreamingText('');
       setMessages(prev => [...prev, {
         id: `m${++msgIdCounter}`,
         role: 'assistant',
@@ -121,7 +123,7 @@ export function useChat(sessionId = null) {
     };
 
     streamRef.current = es;
-  }, [isStreaming]);
+  }, [isStreaming, messages, saveToBackend]);
 
   const stopStreaming = useCallback(() => {
     if (streamRef.current instanceof EventSource) {

@@ -7,19 +7,6 @@ const SUGGESTED_QUERIES = [
   { icon: 'account_balance_wallet', title: 'Finance Contact', desc: 'Directly message the Travel Compliance department.', query: 'How do I contact the Travel Compliance department for expense queries?' },
 ];
 
-const MOCK_RESPONSE = `Based on the OpsMind Knowledge Base, here is the relevant information:
-
-**Pre-Approval Requirements:**
-- Written authorization from your Department VP is required 14 days prior to departure.
-- For expenses exceeding $5,000, CFO co-approval is also needed.
-
-**Documentation:**
-- Original itemized receipts must be submitted via the Concur portal within 3 business days of return.
-- Currency conversions should use the Oanda exchange rate on the date of transaction.
-
-**Compliance Notes:**
-- All international travel must be registered in the Corporate Travel Registry at least 7 business days in advance.`;
-
 function TypingIndicator() {
   return (
     <div className="flex justify-start items-start gap-4 py-2 animate-fade-in">
@@ -37,7 +24,7 @@ function TypingIndicator() {
   );
 }
 
-export default function ChatWindow({ messages, setMessages, isStreaming, setIsStreaming, streamingText, setStreamingText }) {
+export default function ChatWindow({ messages, isStreaming, streamingText, sendMessage }) {
   const { user } = useAuth();
   const [input, setInput] = useState('');
   const bottomRef = useRef(null);
@@ -52,36 +39,7 @@ export default function ChatWindow({ messages, setMessages, isStreaming, setIsSt
     if (!q || isStreaming) return;
     setInput('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
-
-    const userMsg = {
-      role: 'user', content: q, id: Date.now(),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-    setMessages(prev => [...prev, userMsg]);
-    setIsStreaming(true);
-    setStreamingText('');
-
-    let i = 0;
-    const interval = setInterval(() => {
-      i += 5;
-      setStreamingText(MOCK_RESPONSE.slice(0, i));
-      if (i >= MOCK_RESPONSE.length) {
-        clearInterval(interval);
-        setIsStreaming(false);
-        setStreamingText('');
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: MOCK_RESPONSE,
-          id: Date.now() + 1,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          citations: [
-            { label: 'Travel Policy p.14' },
-            { label: 'Expense SOP v4.2' },
-            { label: 'Finance Audit 2023' },
-          ],
-        }]);
-      }
-    }, 15);
+    sendMessage(q);
   };
 
   const handleKeyDown = (e) => {
