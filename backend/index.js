@@ -89,6 +89,7 @@ app.get('/api/admin/docs', async (req, res) => {
     const list = await documents.find({}, { projection: { filename: 1, uploadedAt: 1, pages: 1, size: 1 } }).toArray();
     res.json(list);
   } catch (e) {
+    console.error('Failed to list documents:', e);
     res.status(500).json({ error: 'list_failed' });
   }
 });
@@ -116,6 +117,7 @@ app.get('/api/chat/sessions', async (req, res) => {
     const list = await sessions.find({}, { projection: { messages: 0 }, sort: { updatedAt: -1 } }).toArray();
     res.json(list);
   } catch (e) {
+    console.error('Failed to list chat sessions:', e);
     res.status(500).json({ error: 'sessions_failed' });
   }
 });
@@ -127,6 +129,7 @@ app.get('/api/chat/sessions/:id', async (req, res) => {
     if (!s) return res.status(404).json({ error: 'not_found' });
     res.json(s);
   } catch (e) {
+    console.error('Failed to fetch chat session:', e);
     res.status(500).json({ error: 'fetch_session_failed' });
   }
 });
@@ -149,6 +152,7 @@ app.post('/api/chat/sessions', async (req, res) => {
       res.json({ ok: true, id: insertedId });
     }
   } catch (e) {
+    console.error('Failed to save chat session:', e);
     res.status(500).json({ error: 'save_session_failed' });
   }
 });
@@ -159,6 +163,7 @@ app.delete('/api/chat/sessions/:id', async (req, res) => {
     await sessions.deleteOne({ _id: new ObjectId(req.params.id) });
     res.json({ ok: true });
   } catch (e) {
+    console.error('Failed to delete chat session:', e);
     res.status(500).json({ error: 'delete_session_failed' });
   }
 });
@@ -229,6 +234,7 @@ app.get('/api/chat/stream', async (req, res) => {
       }, 25);
     }
   } catch (e) {
+    console.error('Failed to stream chat response:', e);
     try {
       res.write('data: [DONE]\n\n');
       res.end();
