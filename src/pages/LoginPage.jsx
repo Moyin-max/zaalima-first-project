@@ -17,8 +17,12 @@ export default function LoginPage() {
     if (!email || !password) { setError('Please fill in all fields.'); return; }
     setLoading(true);
     setTimeout(() => {
-      login(email, password);
+      const result = login(email, password);
       setLoading(false);
+      if (!result?.ok) {
+        setError(result?.error || 'Unable to sign in right now.');
+        return;
+      }
       navigate('/chat');
     }, 800);
   };

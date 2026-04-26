@@ -25,8 +25,12 @@ export default function SignupPage() {
     }
     setLoading(true);
     setTimeout(() => {
-      signup(form.name, form.email, form.password);
+      const result = signup(form.name, form.email, form.password);
       setLoading(false);
+      if (!result?.ok) {
+        setError(result?.error || 'Unable to create account right now.');
+        return;
+      }
       navigate('/chat');
     }, 800);
   };

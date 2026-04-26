@@ -1,16 +1,53 @@
-# React + Vite
+# OpsMind AI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+OpsMind AI is a Vite + React frontend with an Express backend for SOP search, chat sessions, and document upload/indexing.
 
-Currently, two official plugins are available:
+## Local Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Frontend:
+- Copy `.env.example` to `.env` if you want to override the API URL.
+- Run `npm install`
+- Run `npm run dev`
 
-## React Compiler
+Backend:
+- Copy `backend/.env.example` to `backend/.env`
+- Fill in your MongoDB and Google API values
+- Run `npm install` inside `backend`
+- Run `npm run dev` inside `backend`
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Environment Variables
 
-## Expanding the ESLint configuration
+Frontend:
+- `VITE_API_URL`
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Backend:
+- `PORT`
+- `MONGODB_URI`
+- `MONGODB_DB`
+- `GEMINI_EMBEDDING_MODEL`
+- `GEMINI_CHAT_MODEL`
+- `GOOGLE_API_KEY`
+- `ALLOWED_ORIGIN`
+
+## Deployment
+
+Recommended setup:
+- Deploy the frontend on Vercel
+- Deploy the backend on Render or Railway
+
+Frontend deployment env:
+- `VITE_API_URL=https://your-backend-url`
+
+Backend deployment env:
+- `PORT`
+- `MONGODB_URI`
+- `MONGODB_DB`
+- `GEMINI_EMBEDDING_MODEL`
+- `GEMINI_CHAT_MODEL`
+- `GOOGLE_API_KEY`
+- `ALLOWED_ORIGIN=https://your-frontend-url`
+
+## Build
+
+Frontend production build:
+- `npm run build`
