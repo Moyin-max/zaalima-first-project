@@ -12,7 +12,11 @@ app.use(cors({ origin: process.env.ALLOWED_ORIGIN || '*', credentials: false }))
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
-const client = new MongoClient(process.env.MONGODB_URI, { ignoreUndefined: true });
+const client = new MongoClient(process.env.MONGODB_URI, {
+  ignoreUndefined: true,
+  tls: true,
+  retryWrites: true,
+});
 let db, documents, chunks, sessions, bucket, genAI, embedModel, chatModel;
 
 function chunkText(text, size = 1000, overlap = 100) {
