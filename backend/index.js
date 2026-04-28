@@ -49,7 +49,7 @@ async function ensureConn() {
   }
   if (!genAI) {
     genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-    embedModel = genAI.getGenerativeModel({ model: process.env.GEMINI_EMBEDDING_MODEL || 'text-embedding-004' });
+    embedModel = genAI.getGenerativeModel({ model: process.env.GEMINI_EMBEDDING_MODEL || 'embedding-001' });
     chatModel = genAI.getGenerativeModel({ model: process.env.GEMINI_CHAT_MODEL || 'gemini-1.5-flash' });
   }
 }
@@ -106,7 +106,7 @@ app.delete('/api/admin/docs/:id', async (req, res) => {
     if (!doc) return res.status(404).json({ error: 'not_found' });
     await chunks.deleteMany({ docId: id });
     if (doc.fileId) {
-      try { await bucket.delete(new ObjectId(doc.fileId)); } catch (_) {}
+      try { await bucket.delete(new ObjectId(doc.fileId)); } catch (_) { }
     }
     await documents.deleteOne({ _id: id });
     res.json({ ok: true });
@@ -142,12 +142,12 @@ app.post('/api/chat/sessions', async (req, res) => {
   try {
     await ensureConn();
     const { id, title, messages } = req.body;
-    const update = { 
-      title: title || 'New Chat', 
-      messages: messages || [], 
-      updatedAt: new Date() 
+    const update = {
+      title: title || 'New Chat',
+      messages: messages || [],
+      updatedAt: new Date()
     };
-    
+
     if (id && ObjectId.isValid(id)) {
       await sessions.updateOne({ _id: new ObjectId(id) }, { $set: update }, { upsert: true });
       res.json({ ok: true, id });
@@ -242,11 +242,11 @@ app.get('/api/chat/stream', async (req, res) => {
     try {
       res.write('data: [DONE]\n\n');
       res.end();
-    } catch (_) {}
+    } catch (_) { }
   }
 });
 
 const port = Number(process.env.PORT || 7001);
 app.listen(port, () => {
-    console.log(`OpsMind Backend running on port ${port}`);
+  console.log(`OpsMind Backend running on port ${port}`);
 });
