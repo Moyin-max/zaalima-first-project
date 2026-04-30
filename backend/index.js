@@ -66,7 +66,7 @@ async function ensureConn() {
     });
 
     chatModel = genAI.getGenerativeModel({
-      model: process.env.GEMINI_CHAT_MODEL || 'gemini-1.5-flash'
+      model: process.env.GEMINI_CHAT_MODEL || 'gemini-2.0-flash'
     });
   }
 }
