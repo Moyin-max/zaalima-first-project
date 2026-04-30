@@ -62,7 +62,7 @@ async function ensureConn() {
     genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
     embedModel = genAI.getGenerativeModel({
-      model: process.env.GEMINI_EMBEDDING_MODEL || 'embedding-001'
+      model: process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001'
     });
 
     chatModel = genAI.getGenerativeModel({
