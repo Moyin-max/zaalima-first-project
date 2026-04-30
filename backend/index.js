@@ -202,8 +202,17 @@ app.get('/api/chat/stream', async (req, res) => {
     res.end();
   } catch (e) {
     console.error('Chat failed:', e);
-    res.write('data: [DONE]\n\n');
-    res.end();
+    const isQuotaError = e?.status === 429;
+    const fallback = isQuotaError
+      ? 'The AI response service is temporarily unavailable because the current Gemini API quota has been exceeded. Please try again later or update the API key/billing setup.'
+      : 'The AI response service is temporarily unavailable right now. Please try again again in a moment.';
+    try {
+      res.write(`data: ${JSON.stringify({ delta: fallback })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+    } catch (_) {
+      res.end();
+    }
   }
 });
 
