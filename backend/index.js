@@ -61,9 +61,8 @@ async function ensureConn() {
   if (!genAI) {
     genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-    // ✅ FIXED MODEL NAMES
     embedModel = genAI.getGenerativeModel({
-      model: 'text-embedding-004'
+      model: process.env.GEMINI_EMBEDDING_MODEL || 'embedding-001'
     });
 
     chatModel = genAI.getGenerativeModel({
@@ -212,4 +211,3 @@ const port = Number(process.env.PORT || 7001);
 app.listen(port, () => {
   console.log(`OpsMind Backend running on port ${port}`);
 });
-
