@@ -37,6 +37,86 @@ function chunkText(text, size = 1000, overlap = 100) {
   return res;
 }
 
+function tokenizeQuery(query) {
+  return String(query || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((token) => token.length > 2);
+}
+
+async function fallbackRetrieve(query) {
+  const terms = [...new Set(tokenizeQuery(query))].slice(0, 8);
+  const regex = terms.length ? new RegExp(terms.join('|'), 'i') : /.*/i;
+
+  const candidates = await chunks
+    .find(
+      {
+        $or: [
+          { text: regex },
+          { filename: regex },
+        ],
+      },
+      {
+        projection: {
+          _id: 1,
+          docId: 1,
+          filename: 1,
+          text: 1,
+          page: 1,
+          chunk: 1,
+        },
+      }
+    )
+    .limit(20)
+    .toArray();
+
+  const scored = candidates
+    .map((candidate) => {
+      const haystack = `${candidate.filename} ${candidate.text}`.toLowerCase();
+      const score = terms.reduce((sum, term) => sum + (haystack.includes(term) ? 1 : 0), 0);
+      return { ...candidate, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+
+  return scored;
+}
+
+function buildDemoAnswer(query, sources) {
+  if (!sources.length) {
+    return [
+      'Demo mode is active because the live AI service is currently unavailable.',
+      `I could not find a reliable SOP source for "${query}" in the indexed documents.`,
+      'Please upload more SOP PDFs or restore the Gemini API quota to enable live answers.',
+    ].join('\n\n');
+  }
+
+  const sourceLines = sources.map((source, index) => {
+    const snippet = String(source.text || '').replace(/\s+/g, ' ').trim().slice(0, 260);
+    return `[Source ${index + 1}] ${source.filename}${source.page ? ` (Page ${source.page})` : ''}: ${snippet}`;
+  });
+
+  return [
+    'Demo mode is active because the live AI service is currently unavailable.',
+    `Here are the most relevant SOP excerpts I found for "${query}":`,
+    ...sourceLines,
+    'Please treat this as a source-grounded demo response until the Gemini API quota is restored.',
+  ].join('\n\n');
+}
+
+function streamSseMessage(res, payload) {
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
+async function streamDemoFallback(res, query, sources) {
+  const answer = buildDemoAnswer(query, sources);
+  streamSseMessage(res, { delta: answer });
+  streamSseMessage(res, { sources });
+  res.write('data: [DONE]\n\n');
+  res.end();
+}
+
 // ✅ FIXED EMBEDDING FUNCTION (stable across API responses)
 async function embed(text) {
   try {
@@ -147,44 +227,51 @@ app.get('/api/chat/stream', async (req, res) => {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(400).end();
 
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
     const qEmb = await embed(q);
 
-    if (!qEmb.length) {
-      return res.status(500).json({ error: 'embedding_failed' });
+    let agg = [];
+
+    if (qEmb.length) {
+      agg = await chunks
+        .aggregate([
+          {
+            $vectorSearch: {
+              index: 'rag_index',
+              path: 'embedding',
+              queryVector: qEmb,
+              numCandidates: 200,
+              limit: 5,
+            },
+          },
+          {
+            $project: {
+              _id: 1,
+              docId: 1,
+              text: 1,
+              filename: 1,
+              page: 1,
+              chunk: 1,
+              score: { $meta: 'vectorSearchScore' },
+            },
+          },
+        ])
+        .toArray();
     }
 
-    const agg = await chunks
-      .aggregate([
-        {
-          $vectorSearch: {
-            index: 'rag_index',
-            path: 'embedding',
-            queryVector: qEmb,
-            numCandidates: 200,
-            limit: 5,
-          },
-        },
-        {
-          $project: {
-            text: 1,
-            filename: 1,
-            chunk: 1,
-            score: { $meta: 'vectorSearchScore' },
-          },
-        },
-      ])
-      .toArray();
+    if (!agg.length) {
+      agg = await fallbackRetrieve(q);
+    }
 
     const context = agg
       .map((c, i) => `Source ${i + 1}:\n${c.text}`)
       .join('\n\n');
 
     const prompt = `Answer using ONLY the sources below. If not found, say "I don't know."\n\nQuestion:\n${q}\n\nSources:\n${context}`;
-
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders();
 
     const result = await chatModel.generateContentStream({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -193,24 +280,25 @@ app.get('/api/chat/stream', async (req, res) => {
     for await (const chunk of result.stream) {
       const t = chunk.text();
       if (t) {
-        res.write(`data: ${JSON.stringify({ delta: t })}\n\n`);
+        streamSseMessage(res, { delta: t });
       }
     }
 
-    res.write(`data: ${JSON.stringify({ sources: agg })}\n\n`);
+    streamSseMessage(res, { sources: agg });
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (e) {
     console.error('Chat failed:', e);
-    const isQuotaError = e?.status === 429;
-    const fallback = isQuotaError
-      ? 'The AI response service is temporarily unavailable because the current Gemini API quota has been exceeded. Please try again later or update the API key/billing setup.'
-      : 'The AI response service is temporarily unavailable right now. Please try again again in a moment.';
     try {
-      res.write(`data: ${JSON.stringify({ delta: fallback })}\n\n`);
+      const q = String(req.query.q || '').trim();
+      const fallbackSources = await fallbackRetrieve(q);
+      await streamDemoFallback(res, q, fallbackSources);
+    } catch (fallbackError) {
+      console.error('Demo fallback failed:', fallbackError);
+      streamSseMessage(res, {
+        delta: 'Demo mode could not load source excerpts right now. Please try again shortly.',
+      });
       res.write('data: [DONE]\n\n');
-      res.end();
-    } catch (_) {
       res.end();
     }
   }
