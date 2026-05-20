@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7001';
 
 export default function Topbar() {
   const { user } = useAuth();
@@ -92,41 +94,248 @@ export default function Topbar() {
 
       {/* Upload Modal */}
       {showUploadModal && (
-        <div
-          className="fixed inset-0 bg-black/50 dark:bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in"
-          onClick={() => setShowUploadModal(false)}
-        >
-          <div
-            className="bg-white dark:bg-[#1a1d27] border border-slate-200 dark:border-[#2a2f4a] rounded-2xl shadow-2xl w-full max-w-md p-6 animate-fade-in"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="font-h3 text-lg font-bold text-slate-900 dark:text-white">Upload SOP Document</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Supported: PDF, DOCX, XLSX, JSON</p>
-              </div>
-              <button
-                onClick={() => setShowUploadModal(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#21253a]"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            </div>
-            <div className="border-2 border-dashed border-slate-200 dark:border-[#2a2f4a] rounded-2xl p-10 text-center hover:border-secondary/60 transition-colors cursor-pointer mb-4">
-              <span className="material-symbols-outlined text-slate-300 dark:text-slate-600 text-5xl mb-3 block">upload_file</span>
-              <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Drop file here or click to browse</p>
-              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Max file size: 50MB</p>
-              <input type="file" className="hidden" accept=".pdf,.docx,.xlsx,.json" />
-            </div>
-            <button
-              onClick={() => setShowUploadModal(false)}
-              className="w-full bg-primary-container text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-all"
-            >
-              Upload Document
-            </button>
-          </div>
-        </div>
+        <UploadModal onClose={() => setShowUploadModal(false)} />
       )}
     </>
+  );
+}
+
+
+function UploadModal({ onClose }) {
+  const fileInputRef = useRef(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [uploadResult, setUploadResult] = useState(null); // { ok, error, chunks }
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleFileSelect = useCallback((file) => {
+    if (!file) return;
+    const allowed = ['application/pdf'];
+    if (!allowed.includes(file.type)) {
+      setUploadResult({ ok: false, error: 'Only PDF files are supported for upload.' });
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      setUploadResult({ ok: false, error: 'File size must be under 50 MB.' });
+      return;
+    }
+    setSelectedFile(file);
+    setUploadResult(null);
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (file) handleFileSelect(file);
+  }, [handleFileSelect]);
+
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+  }, []);
+
+  const handleUpload = async () => {
+    if (!selectedFile || uploading) return;
+
+    setUploading(true);
+    setProgress(0);
+    setUploadResult(null);
+
+    // Simulate progress for UX (actual upload is a single POST)
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 85) { clearInterval(progressInterval); return prev; }
+        return prev + Math.random() * 15;
+      });
+    }, 300);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      const res = await fetch(`${API_URL}/api/admin/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      clearInterval(progressInterval);
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Upload failed (${res.status})`);
+      }
+
+      const data = await res.json();
+      setProgress(100);
+      setUploadResult({ ok: true, chunks: data.chunks, documentId: data.documentId });
+    } catch (err) {
+      clearInterval(progressInterval);
+      setProgress(0);
+      setUploadResult({ ok: false, error: err.message || 'Upload failed. Please try again.' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const resetModal = () => {
+    setSelectedFile(null);
+    setUploadResult(null);
+    setProgress(0);
+  };
+
+  const fileSizeMB = selectedFile ? (selectedFile.size / (1024 * 1024)).toFixed(2) : null;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 dark:bg-black/70 z-[100] flex items-center justify-center p-4 animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-[#1a1d27] border border-slate-200 dark:border-[#2a2f4a] rounded-2xl shadow-2xl w-full max-w-md p-6 animate-fade-in"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="font-h3 text-lg font-bold text-slate-900 dark:text-white">Upload SOP Document</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Supported: PDF (max 50 MB)</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#21253a]"
+          >
+            <span className="material-symbols-outlined text-[20px]">close</span>
+          </button>
+        </div>
+
+        {/* Success state */}
+        {uploadResult?.ok ? (
+          <div className="text-center py-6">
+            <div className="w-16 h-16 bg-secondary/15 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-secondary text-3xl">check_circle</span>
+            </div>
+            <h4 className="font-semibold text-slate-900 dark:text-white text-lg mb-1">Upload Successful!</h4>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{selectedFile?.name}</p>
+            <p className="text-xs text-secondary font-semibold">{uploadResult.chunks} chunks indexed into knowledge base</p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={resetModal}
+                className="flex-1 border border-slate-200 dark:border-[#2a2f4a] text-slate-700 dark:text-slate-300 font-semibold py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-[#21253a] transition-colors text-sm"
+              >
+                Upload Another
+              </button>
+              <button
+                onClick={onClose}
+                className="flex-1 bg-primary-container text-white font-semibold py-2.5 rounded-xl hover:opacity-90 transition-all text-sm"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Drop zone */}
+            <div
+              className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors cursor-pointer mb-4
+                ${dragOver
+                  ? 'border-secondary bg-secondary/5 dark:bg-secondary/10'
+                  : selectedFile
+                    ? 'border-secondary/40 bg-secondary/5 dark:bg-secondary/10'
+                    : 'border-slate-200 dark:border-[#2a2f4a] hover:border-secondary/60'
+                }`}
+              onClick={() => fileInputRef.current?.click()}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+            >
+              {selectedFile ? (
+                <div>
+                  <span className="material-symbols-outlined text-secondary text-4xl mb-3 block">description</span>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1 truncate px-4">{selectedFile.name}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{fileSizeMB} MB</p>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); resetModal(); }}
+                    className="mt-3 text-xs text-error font-semibold hover:underline"
+                  >
+                    Remove & choose different file
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <span className="material-symbols-outlined text-slate-300 dark:text-slate-600 text-5xl mb-3 block">upload_file</span>
+                  <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Drop file here or click to browse</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Max file size: 50 MB</p>
+                </div>
+              )}
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept=".pdf"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) handleFileSelect(e.target.files[0]);
+                  e.target.value = ''; // Allow re-selecting same file
+                }}
+              />
+            </div>
+
+            {/* Progress bar */}
+            {uploading && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1.5">
+                  <span className="font-semibold">Uploading & indexing...</span>
+                  <span>{Math.round(progress)}%</span>
+                </div>
+                <div className="w-full h-2 bg-slate-100 dark:bg-[#21253a] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-secondary to-secondary/70 rounded-full transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Error message */}
+            {uploadResult?.error && (
+              <div className="mb-4 px-4 py-3 bg-error-container/20 border border-error/20 rounded-xl flex items-start gap-2.5">
+                <span className="material-symbols-outlined text-error text-[18px] mt-0.5">error</span>
+                <p className="text-xs text-error font-medium leading-relaxed">{uploadResult.error}</p>
+              </div>
+            )}
+
+            {/* Upload button */}
+            <button
+              onClick={handleUpload}
+              disabled={!selectedFile || uploading}
+              className="w-full bg-primary-container text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-all
+                disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {uploading ? (
+                <>
+                  <span className="material-symbols-outlined text-[18px] animate-spin">refresh</span>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-[18px]">cloud_upload</span>
+                  Upload Document
+                </>
+              )}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

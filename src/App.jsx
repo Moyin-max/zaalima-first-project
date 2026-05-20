@@ -9,19 +9,22 @@ import ChatWindow from './components/ChatWindow';
 import AdminDashboard from './components/AdminDashboard';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
-import { useChat } from './hooks/useChat';
 
 function ProtectedLayout() {
+  const [messages, setMessages] = useState([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
   const [activeId, setActiveId] = useState(null);
-  const { messages, isStreaming, streamingText, sendMessage, clearMessages } = useChat(activeId);
 
   const handleNewChat = (id) => {
     if (messages.length > 0) {
       const title = messages[0]?.content?.slice(0, 40) + '...' || 'New Chat';
       setChatHistory(prev => [{ id: activeId || id, title }, ...prev.filter(h => h.id !== activeId)]);
     }
-    clearMessages();
+    setMessages([]);
+    setIsStreaming(false);
+    setStreamingText('');
     setActiveId(id);
   };
 
@@ -38,9 +41,11 @@ function ProtectedLayout() {
         <Route path="/chat" element={
           <ChatWindow
             messages={messages}
+            setMessages={setMessages}
             isStreaming={isStreaming}
+            setIsStreaming={setIsStreaming}
             streamingText={streamingText}
-            sendMessage={sendMessage}
+            setStreamingText={setStreamingText}
           />
         } />
         <Route path="/admin" element={<AdminDashboard />} />

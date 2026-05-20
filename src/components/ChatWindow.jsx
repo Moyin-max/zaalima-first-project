@@ -1,5 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7001';
 
 const SUGGESTED_QUERIES = [
   { icon: 'receipt_long', title: 'Expense Form', desc: 'Download the 2024 International Reimbursement template.', query: 'Where can I find the 2024 international expense reimbursement form?' },
@@ -24,23 +26,154 @@ function TypingIndicator() {
   );
 }
 
-export default function ChatWindow({ messages, isStreaming, streamingText, sendMessage }) {
+// Simple markdown-like formatting for bold text and lists
+function FormattedContent({ text }) {
+  if (!text) return null;
+  
+  const lines = text.split('\n');
+  const elements = [];
+  
+  lines.forEach((line, lineIdx) => {
+    // Process inline bold: **text**
+    const parts = line.split(/(\*\*[^*]+\*\*)/g);
+    const processedParts = parts.map((part, partIdx) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={partIdx} className="font-semibold text-slate-900 dark:text-white">{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+    
+    if (line.trim().startsWith('- ')) {
+      elements.push(
+        <div key={lineIdx} className="flex items-start gap-2 ml-2">
+          <span className="text-secondary mt-1.5 text-[6px]">●</span>
+          <span>{processedParts.map((p, i) => typeof p === 'string' ? p.replace(/^- /, '') : p)}</span>
+        </div>
+      );
+    } else if (line.trim() === '') {
+      elements.push(<div key={lineIdx} className="h-2" />);
+    } else {
+      elements.push(<div key={lineIdx}>{processedParts}</div>);
+    }
+  });
+  
+  return <div className="space-y-0.5">{elements}</div>;
+}
+
+export default function ChatWindow({ messages, setMessages, isStreaming, setIsStreaming, streamingText, setStreamingText }) {
   const { user } = useAuth();
   const [input, setInput] = useState('');
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
+  const eventSourceRef = useRef(null);
+  const [copiedId, setCopiedId] = useState(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingText, isStreaming]);
 
-  const handleSend = (text = input) => {
+  // Cleanup EventSource on unmount
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleSend = useCallback((text = input) => {
     const q = (typeof text === 'string' ? text : input).trim();
     if (!q || isStreaming) return;
     setInput('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
-    sendMessage(q);
-  };
+
+    const userMsg = {
+      role: 'user', content: q, id: Date.now(),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setMessages(prev => [...prev, userMsg]);
+    setIsStreaming(true);
+    setStreamingText('');
+
+    // Use Server-Sent Events to stream from backend
+    const es = new EventSource(`${API_URL}/api/chat/stream?q=${encodeURIComponent(q)}`);
+    eventSourceRef.current = es;
+
+    let fullText = '';
+    let sources = [];
+
+    es.onmessage = (e) => {
+      if (e.data === '[DONE]') {
+        es.close();
+        eventSourceRef.current = null;
+        setIsStreaming(false);
+        setStreamingText('');
+
+        const aiMsg = {
+          role: 'assistant',
+          content: fullText,
+          id: Date.now() + 1,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          sources: sources.map(s => ({
+            id: s._id,
+            fileName: s.filename,
+            page: s.page || 1,
+            snippet: s.text?.slice(0, 150) + '...',
+            relevance: s.score || 0.9,
+          })),
+          citations: sources.map((s, i) => ({
+            label: `${s.filename} • Chunk ${s.chunk ?? i}`,
+            sourceId: (s.docId || '') + i,
+          })),
+        };
+
+        setMessages(prev => [...prev, aiMsg]);
+        return;
+      }
+
+      try {
+        const payload = JSON.parse(e.data);
+        if (payload.delta) {
+          fullText += payload.delta;
+          setStreamingText(fullText);
+        }
+        if (payload.sources) {
+          sources = payload.sources;
+        }
+      } catch (err) {
+        console.error('SSE parse error:', err);
+      }
+    };
+
+    es.onerror = () => {
+      es.close();
+      eventSourceRef.current = null;
+      setIsStreaming(false);
+      setStreamingText('');
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Sorry, I encountered an error connecting to the backend. Make sure the backend server is running on port 7001.',
+        id: Date.now() + 1,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }]);
+    };
+  }, [input, isStreaming, setMessages, setIsStreaming, setStreamingText]);
+
+  const handleStop = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    setIsStreaming(false);
+    setStreamingText('');
+  }, [setIsStreaming, setStreamingText]);
+
+  const handleCopy = useCallback((content, id) => {
+    navigator.clipboard.writeText(content);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  }, []);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
@@ -83,7 +216,7 @@ export default function ChatWindow({ messages, isStreaming, streamingText, sendM
         /* ── Messages ── */
         <div className="flex-1 overflow-y-auto px-6 pb-36 pt-6 scrollbar-hide">
           <div className="max-w-3xl mx-auto space-y-6">
-            {messages.map((m, idx) => (
+            {messages.map((m) => (
               m.role === 'user' ? (
                 <div key={m.id} className="flex justify-end items-end gap-3 animate-fade-in">
                   <div className="flex flex-col items-end gap-1 max-w-[75%]">
@@ -102,7 +235,9 @@ export default function ChatWindow({ messages, isStreaming, streamingText, sendM
                   <div className="flex-1 max-w-[85%]">
                     <div className="bg-white dark:bg-[#1a1d27] border border-slate-200 dark:border-[#2a2f4a] px-6 py-5 rounded-2xl rounded-tl-sm shadow-sm relative overflow-hidden">
                       <div className="absolute left-0 top-0 w-1 h-full bg-secondary rounded-l-2xl" />
-                      <p className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">{m.content}</p>
+                      <div className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed">
+                        <FormattedContent text={m.content} />
+                      </div>
                       {m.citations?.length > 0 && (
                         <div className="mt-4 pt-4 border-t border-slate-100 dark:border-[#21253a] flex flex-wrap gap-2 items-center">
                           <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold mr-1">Sources:</span>
@@ -117,11 +252,13 @@ export default function ChatWindow({ messages, isStreaming, streamingText, sendM
                     </div>
                     <div className="flex items-center gap-1 mt-2 ml-1">
                       <button
-                        onClick={() => navigator.clipboard.writeText(m.content)}
+                        onClick={() => handleCopy(m.content, m.id)}
                         className="text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#21253a] transition-colors"
                         title="Copy"
                       >
-                        <span className="material-symbols-outlined text-[15px]">content_copy</span>
+                        <span className="material-symbols-outlined text-[15px]">
+                          {copiedId === m.id ? 'check' : 'content_copy'}
+                        </span>
                       </button>
                       <button className="text-slate-400 dark:text-slate-600 hover:text-green-500 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#21253a] transition-colors">
                         <span className="material-symbols-outlined text-[15px]">thumb_up</span>
@@ -141,12 +278,23 @@ export default function ChatWindow({ messages, isStreaming, streamingText, sendM
                 <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center flex-shrink-0 mt-1">
                   <span className="material-symbols-outlined text-white text-[16px]">psychology</span>
                 </div>
-                <div className="bg-white dark:bg-[#1a1d27] border border-slate-200 dark:border-[#2a2f4a] px-6 py-5 rounded-2xl rounded-tl-sm shadow-sm max-w-[85%] relative overflow-hidden">
-                  <div className="absolute left-0 top-0 w-1 h-full bg-secondary/60 rounded-l-2xl animate-pulse" />
-                  <p className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
-                    {streamingText}
-                    <span className="inline-block w-0.5 h-4 bg-secondary ml-0.5 animate-pulse align-middle" />
-                  </p>
+                <div className="flex-1 max-w-[85%]">
+                  <div className="bg-white dark:bg-[#1a1d27] border border-slate-200 dark:border-[#2a2f4a] px-6 py-5 rounded-2xl rounded-tl-sm shadow-sm relative overflow-hidden">
+                    <div className="absolute left-0 top-0 w-1 h-full bg-secondary/60 rounded-l-2xl animate-pulse" />
+                    <div className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed">
+                      <FormattedContent text={streamingText} />
+                      <span className="inline-block w-0.5 h-4 bg-secondary ml-0.5 animate-pulse align-middle" />
+                    </div>
+                  </div>
+                  <div className="flex items-center mt-2 ml-1">
+                    <button
+                      onClick={handleStop}
+                      className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 hover:text-error p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-[#21253a] transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">stop_circle</span>
+                      Stop generating
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : <TypingIndicator />)}
@@ -184,19 +332,29 @@ export default function ChatWindow({ messages, isStreaming, streamingText, sendM
               <button className="p-2.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
                 <span className="material-symbols-outlined text-[20px]">mic</span>
               </button>
-              <button
-                onClick={() => handleSend()}
-                disabled={!input.trim() || isStreaming}
-                className="bg-primary-container text-white p-2.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed hover-lift"
-              >
-                <span className="material-symbols-outlined text-[20px]">send</span>
-              </button>
+              {isStreaming ? (
+                <button
+                  onClick={handleStop}
+                  className="bg-error text-white p-2.5 rounded-xl hover:opacity-90 transition-all hover-lift"
+                  title="Stop generating"
+                >
+                  <span className="material-symbols-outlined text-[20px]">stop</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleSend()}
+                  disabled={!input.trim()}
+                  className="bg-primary-container text-white p-2.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed hover-lift"
+                >
+                  <span className="material-symbols-outlined text-[20px]">send</span>
+                </button>
+              )}
             </div>
           </div>
           <div className="flex justify-center gap-6 mt-3">
             <span className="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
               <span className="material-symbols-outlined text-[13px]">history</span>
-              Syncing with Knowledge Base v1.9
+              Syncing with Knowledge Base
             </span>
             <span className="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
               <span className="material-symbols-outlined text-[13px]">shield</span>
