@@ -4,8 +4,8 @@ let msgIdCounter = 100;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:7001';
 
 export function useChat(sessionId = null) {
-  const [messages, setMessages]         = useState([]);
-  const [isStreaming, setIsStreaming]   = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const currentSessionId = useRef(sessionId);
   const streamRef = useRef(null);
@@ -47,12 +47,13 @@ export function useChat(sessionId = null) {
   }, []);
 
   const sendMessage = useCallback((text) => {
-    if (!text.trim() || isStreaming) return;
+    const query = text.trim();
+    if (!query || isStreaming) return;
 
     const userMsg = {
       id: `m${++msgIdCounter}`,
       role: 'user',
-      content: text.trim(),
+      content: query,
       timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     };
 
@@ -61,12 +62,14 @@ export function useChat(sessionId = null) {
     setIsStreaming(true);
     setStreamingText('');
 
-    const es = new EventSource(`${API_URL}/api/chat/stream?q=${encodeURIComponent(text.trim())}`);
+    const es = new EventSource(`${API_URL}/api/chat/stream?q=${encodeURIComponent(query)}`);
     
     let fullText = '';
     let sources = [];
+    let finalized = false;
     es.onmessage = (e) => {
       if (e.data === '[DONE]') {
+        finalized = true;
         es.close();
         setIsStreaming(false);
         setStreamingText('');
@@ -111,17 +114,45 @@ export function useChat(sessionId = null) {
     es.onerror = (err) => {
       console.error('SSE Error:', err);
       es.close();
+      if (finalized) return;
+
       setIsStreaming(false);
+      setStreamingText('');
+
+      if (fullText.trim()) {
+        const aiMsg = {
+          id: `m${++msgIdCounter}`,
+          role: 'assistant',
+          content: fullText,
+          timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          sources: sources.map(s => ({
+            id: s._id,
+            fileName: s.filename,
+            page: s.page || 1,
+            snippet: s.text,
+            relevance: s.score || 0.9
+          })),
+          citations: sources.map((s, i) => ({
+            label: `${s.filename} • Page ${s.page || 'n/a'}`,
+            sourceId: s.docId + i
+          }))
+        };
+        const updatedMessages = [...newMessages, aiMsg];
+        setMessages(updatedMessages);
+        saveToBackend(updatedMessages);
+        return;
+      }
+
       setMessages(prev => [...prev, {
         id: `m${++msgIdCounter}`,
         role: 'assistant',
-        content: 'Sorry, I encountered an error connecting to the backend.',
+        content: 'Demo mode is temporarily unavailable right now. Please try again in a moment.',
         timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       }]);
     };
 
     streamRef.current = es;
-  }, [isStreaming]);
+  }, [isStreaming, messages, saveToBackend]);
 
   const stopStreaming = useCallback(() => {
     if (streamRef.current instanceof EventSource) {
